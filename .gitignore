@@ -192,3 +192,10 @@ cython_debug/
 
 # Ignore the MLflow local server folder
 /mlruns/
+
+# VSCode settings
+/.vscode/
+/julian.vscode/
+
+# Reference data (you don’t want to commit parquet)
+reference_train_data.parquet
