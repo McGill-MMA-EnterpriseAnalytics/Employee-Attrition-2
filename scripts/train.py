@@ -13,6 +13,11 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 import sys
 import os
+
+# ensure Python can import from src/employee_attrition_mlops
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(src_path)
+
 import logging
 import json
 
@@ -43,6 +48,9 @@ CLASSIFIER_MAP = {
     "gradient_boosting": GradientBoostingClassifier,
 }
 
+os.makedirs(REPORTS_PATH, exist_ok=True)
+
+
 def train_final_model(params_file: str, register_model_as: str = None):
     """
     Loads best parameters from HPO, trains the final model on full training data,
@@ -69,6 +77,15 @@ def train_final_model(params_file: str, register_model_as: str = None):
     # Separate pipeline and model params based on prefixes used in HPO objective
     pipeline_params = {k.replace('pipe_', ''): v for k, v in params.items() if k.startswith('pipe_')}
     model_params = {k.replace('model_', ''): v for k, v in params.items() if k.startswith('model_')}
+    
+    # HPO may have returned 'penalty_saga' when using solver='saga'
+    if 'penalty_saga' in model_params:
+        # rename it to the correct sklearn arg 'penalty'
+        model_params['penalty'] = model_params.pop('penalty_saga')
+    # Remove keys that are not valid sklearn init args
+    for drop in ['type', 'best_f2_cv_mean']:
+        model_params.pop(drop, None)
+    
     feature_selector_params = {k.replace('selector_', ''): v for k, v in params.items() if k.startswith('selector_')}
     # Add selector params under the main pipeline params dict for create_full_pipeline
     pipeline_params['feature_selector_params'] = feature_selector_params
@@ -132,6 +149,25 @@ def train_final_model(params_file: str, register_model_as: str = None):
         logger.info("Fitting final pipeline on full training data...")
         full_pipeline.fit(X_train, y_train)
         logger.info("Pipeline fitting complete.")
+        
+        # --- 4.1: Baseline profile ---
+    try:
+        import tensorflow_data_validation as tfdv
+        # generate a TFDV statistics proto
+        stats = tfdv.generate_statistics_from_dataframe(df)
+        stats_path = os.path.join(REPORTS_PATH, "baseline_stats.pbtxt")
+        tfdv.write_stats_text(stats, stats_path)
+        mlflow.log_artifact(stats_path, artifact_path="baseline_profile")
+        logger.info(f"Logged TFDV baseline profile to {stats_path}")
+    except ImportError:
+        # fallback to pandas if TFDV is unavailable
+        profile = df.describe(include="all").to_json()
+        stats_path = os.path.join(REPORTS_PATH, "baseline_profile.json")
+        with open(stats_path, "w") as f:
+            f.write(profile)
+        mlflow.log_artifact(stats_path, artifact_path="baseline_profile")
+        logger.info(f"Logged pandas baseline profile to {stats_path}")
+
 
         # --- Generate & Log Training Data Profile & Reference Data ---
         # (Copy the artifact logging code from train_py_v2 here)
@@ -143,7 +179,7 @@ def train_final_model(params_file: str, register_model_as: str = None):
             X_train_processed_df = pd.DataFrame(X_train_processed, columns=feature_names)
 
             profile_dict = generate_profile_dict(X_train_processed_df)
-            profile_path = BASELINE_PROFILE_FILENAME
+            profile_path = os.path.join(REPORTS_PATH, BASELINE_PROFILE_FILENAME)
             save_json(profile_dict, profile_path)
             mlflow.log_artifact(profile_path, artifact_path="drift_reference")
             logger.info(f"Logged training data profile to {profile_path}")
@@ -153,7 +189,7 @@ def train_final_model(params_file: str, register_model_as: str = None):
             mlflow.log_artifact(ref_data_path, artifact_path="drift_reference")
             logger.info(f"Logged reference training data to {ref_data_path}")
 
-            ref_features_path = "reference_feature_names.json"
+            ref_features_path = os.path.join(REPORTS_PATH, "reference_feature_names.json")
             save_json(list(X_train_processed_df.columns), ref_features_path)
             mlflow.log_artifact(ref_features_path, artifact_path="drift_reference")
             logger.info(f"Logged reference feature names to {ref_features_path}")
@@ -166,10 +202,10 @@ def train_final_model(params_file: str, register_model_as: str = None):
         y_pred_test = full_pipeline.predict(X_test)
         metrics = { # Calculate final test metrics
             "test_accuracy": accuracy_score(y_test, y_pred_test),
-            "test_f1": f1_score(y_test, y_pred_test),
-            "test_f2": fbeta_score(y_test, y_pred_test, beta=2),
-            "test_precision": precision_score(y_test, y_pred_test, zero_division=0),
-            "test_recall": recall_score(y_test, y_pred_test, zero_division=0),
+            "test_f1": f1_score(y_test, y_pred_test, pos_label="Yes", zero_division=0),
+            "test_f2": fbeta_score(y_test, y_pred_test, beta=2, pos_label="Yes", zero_division=0),
+            "test_precision": precision_score(y_test, y_pred_test, pos_label="Yes", zero_division=0),
+            "test_recall": recall_score(y_test, y_pred_test, pos_label="Yes", zero_division=0),
         }
         if hasattr(full_pipeline, "predict_proba"):
             try:
@@ -184,7 +220,7 @@ def train_final_model(params_file: str, register_model_as: str = None):
         # --- Log Baseline Test Predictions ---
         # (Copy the baseline prediction logging code from train_py_v2 here)
         try:
-            baseline_preds_path = "baseline_test_predictions.json"
+            baseline_preds_path = os.path.join(REPORTS_PATH, "baseline_test_predictions.json")
             preds_data = {"predictions": y_pred_test.tolist(), "true_labels": y_test.tolist()}
             save_json(preds_data, baseline_preds_path)
             mlflow.log_artifact(baseline_preds_path, artifact_path="drift_reference")
@@ -196,7 +232,7 @@ def train_final_model(params_file: str, register_model_as: str = None):
         # (Copy the CM and Feature Importance logging code from train_py_v2 here)
         try: # Confusion Matrix
             cm = confusion_matrix(y_test, y_pred_test)
-            cm_path = "confusion_matrix.json"
+            cm_path = os.path.join(REPORTS_PATH, "confusion_matrix.json")
             save_json({"labels": [0, 1], "matrix": cm.tolist()}, cm_path)
             mlflow.log_artifact(cm_path)
         except Exception as e: logger.error(f"Could not log confusion matrix: {e}")

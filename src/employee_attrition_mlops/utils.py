@@ -82,3 +82,10 @@ def download_mlflow_artifact(run_id: str, artifact_path: str, dst_path: str = No
             logger.error(f"Failed to download artifact '{artifact_path}' from run '{run_id}': {e}")
             return None
 
+def generate_profile_dict(df: pd.DataFrame) -> dict:
+    """
+    Return a JSON‑serializable summary of a DataFrame,
+    analogous to pandas .describe() but as a dict.
+    """
+    # include all columns: numeric, categorical, etc.
+    return df.describe(include='all').to_dict()

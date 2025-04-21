@@ -184,3 +184,11 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Ignore all MLflow run artifacts and report outputs
+/reports/*.json
+/reports/*.pbtxt
+/reports/*.parquet
+
+# Ignore the MLflow local server folder
+/mlruns/
