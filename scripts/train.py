@@ -255,11 +255,19 @@ def train_final_model(params_file: str, register_model_as: str = None):
             registered_model_name=register_model_as
         )
         if register_model_as:
-            logger.info(f"Final model logged and registered as: {register_model_as}")
-        else:
-             logger.info(f"Final model logged to artifact path: {artifact_path}")
-
-        logger.info(f"Final model training complete for parameters in {params_file}. Test F2 Score: {metrics['test_f2']:.4f}")
+            # Immediately transition the newly created version to Staging
+            from mlflow.tracking import MlflowClient
+            client = MlflowClient()
+            # fetch the latest version just registered
+            versions = client.get_latest_versions(register_model_as, stages=[])
+            new_version = versions[-1].version
+            client.transition_model_version_stage(
+                name=register_model_as,
+                version=new_version,
+                stage="Staging",
+                archive_existing_versions=False
+            )
+            logger.info(f"Registered model version {new_version} to 'Staging'")
 
 
 if __name__ == "__main__":
