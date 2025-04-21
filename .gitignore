@@ -1,3 +1,8 @@
+# ignore MLflow artifacts & local reference data
+mlartifacts/
+mlruns/
+reports/*.parquet
+
 # Data
 /data/
 
@@ -199,3 +204,6 @@ cython_debug/
 
 # Reference data (you don’t want to commit parquet)
 reference_train_data.parquet
+mlartifacts/0/bb09854b5141486884cb4f4800d8bc1d/artifacts/drift_reports/drift_report.json
+mlartifacts/0/2dd2fa90a14340bf9e36188469ea9147/artifacts/drift_reports/drift_report.json
+mlartifacts/0/1dc0d1d30449412095c375382622ccf9/artifacts/drift_reports/drift_report.json
