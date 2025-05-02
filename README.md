@@ -1,20 +1,131 @@
 # Employee Attrition MLOps Project
 
-A full-stack MLOps solution for employee attrition prediction, featuring:
+A full-stack MLOps solution for employee attrition prediction with robust drift detection capabilities, featuring:
 - Automated model training, retraining, and promotion
 - Drift detection and monitoring
 - API and Streamlit frontend
 - MLflow tracking and artifact management
 - CI/CD with GitHub Actions and Docker Compose
 
+## Features
+
+- **ML Model Training**: Automated training and validation of employee attrition prediction models
+- **MLflow Integration**: Tracking experiments, model registration, and model versioning
+- **Drift Detection System**: 
+  - Feature drift monitoring with statistical tests
+  - Prediction drift monitoring for model outputs
+  - Automated alerts when drift is detected
+  - Detailed HTML reports with feature-by-feature analysis
+  - FastAPI endpoint for on-demand drift detection
+  - MLflow integration for tracking drift metrics over time
+  - Customizable drift thresholds for different sensitivity levels
+- **GitHub Actions Workflows**:
+  - Automated drift detection on schedule
+  - Model promotion workflow
+  - MLflow metadata maintenance
+- **Visualization**: Comprehensive HTML reports for data and prediction drift
+- **Frontend**: Streamlit app for live predictions and model info
+
 ## Architecture
 
 - **API**: Serves predictions and model info (FastAPI)
 - **Frontend**: Streamlit app for live predictions and model info
 - **MLflow**: Model tracking and artifact storage
-- **Automation**: All workflows managed by GitHub Actions (`production_automation.yml`)
+- **Automation**: All workflows managed by GitHub Actions
 
-## Quickstart
+### Drift Detection Architecture
+
+The drift detection system consists of:
+
+1. **Reference Data Management**:
+   - Saving baseline data for comparison
+   - Storing feature distributions and statistics
+
+2. **Drift Detection Pipeline**:
+   - Feature drift detection using statistical tests
+   - Prediction drift monitoring
+   - HTML report generation
+
+3. **Automation**:
+   - GitHub Actions workflows for scheduled monitoring
+   - Automatic issue creation for detected drift
+   - Model retraining triggers
+
+4. **API Layer**:
+   - FastAPI endpoints for drift detection
+   - Report generation and retrieval
+
+## Getting Started
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/BTCJULIAN/Employee-Attrition-2.git
+cd Employee-Attrition-2
+
+# Install dependencies with Poetry
+poetry install
+```
+
+### Running Drift Detection
+
+```bash
+# Run drift detection with default settings
+python check_production_drift.py
+
+# Generate HTML report for current data
+python scripts/generate_drift_report.py --current-data path/to/data.csv
+
+# Save new reference data (baseline) for drift comparison
+python save_reference_data.py
+```
+
+### Using the Drift Detection API
+
+The project includes a FastAPI endpoint for drift detection:
+
+```bash
+# Start the API server
+python drift_api.py
+
+# Test the API with the test client
+python test_drift_api_client.py
+
+# Access the API documentation at http://localhost:8000/docs
+```
+
+Example API request:
+```python
+import requests
+import pandas as pd
+
+# Load data
+df = pd.read_csv("path/to/data.csv")
+data = df.to_dict(orient="records")
+
+# Detect drift
+response = requests.post(
+    "http://localhost:8000/detect-drift",
+    json={"data": data, "threshold": 0.05}
+)
+
+# Check results
+result = response.json()
+print(f"Drift detected: {result['drift_detected']}")
+```
+
+For comprehensive documentation on drift detection, see the [Drift Detection Guide](docs/drift_detection_guide.md).
+
+### MLflow Maintenance
+
+Repair and maintain MLflow metadata with:
+
+```bash
+python scripts/mlflow_maintenance.py --fix-run-metadata
+```
+
+## Quickstart with Docker
 
 1. Clone the repo and set up `.env`:
    ```bash
@@ -32,96 +143,31 @@ A full-stack MLOps solution for employee attrition prediction, featuring:
    - Frontend: http://localhost:8501
    - MLflow: http://localhost:5001
 
-## Docker Services
-
-| Service        | Purpose                | Port | Description                                    |
-|----------------|------------------------|------|------------------------------------------------|
-| api            | Backend API (FastAPI)  | 8000 | Serves predictions and model info              |
-| frontend       | Frontend (Streamlit)   | 8501 | Interactive dashboard for predictions          |
-| mlflow-server  | MLflow Tracking Server | 5001 | Model tracking, experiments, and artifacts     |
-
 ## Project Structure
 
-```
 /
-├── .github/workflows/    # GitHub Actions workflows
-├── scripts/              # Automation and utility scripts
-├── src/                  # Source code
-│   ├── employee_attrition_mlops/  # Core ML logic
-│   └── frontend/         # Streamlit app
-├── tests/               # Test files
-├── docs/                # Documentation
-├── mlruns/              # MLflow tracking and artifacts
-└── reports/             # Generated reports
-```
+├── .github/workflows/ # GitHub Actions workflows
+├── scripts/ # Automation and utility scripts
+├── src/ # Source code
+│ ├── employee_attrition_mlops/ # Core ML logic
+│ ├── monitoring/ # Drift detection
+│ └── frontend/ # Streamlit app
+├── tests/ # Test files
+├── docs/ # Documentation
+├── mlruns/ # MLflow tracking and artifacts
+└── reports/ # Generated reports
+
+
 
 ## CI/CD & Automation
 
-All automation is managed by `.github/workflows/production_automation.yml`:
+All automation is managed by GitHub Actions workflows:
 - Testing and linting
 - Drift detection
 - Model retraining
 - Batch prediction
 - Model promotion
 - API redeployment
-
-See [CI/CD & Automation](docs/ci_cd_automation.md) for details.
-
-## Model Monitoring
-
-- Drift detection runs on a schedule or on demand
-- If drift is detected, the model is retrained and promoted automatically
-- See [Monitoring & Retraining](docs/monitoring.md) for details
-
-## API Redeployment
-
-After model retraining/promotion:
-1. New model is registered in MLflow
-2. API container is restarted via Docker Compose
-3. Frontend automatically picks up new model info
-
-## Development
-
-### Prerequisites
-- Python 3.11
-- Docker and Docker Compose
-- Poetry (for dependency management)
-
-### Setup
-1. Install dependencies:
-   ```bash
-   poetry install
-   ```
-
-2. Run tests:
-   ```bash
-   poetry run pytest
-   ```
-
-3. Run linting:
-   ```bash
-   poetry run black .
-   poetry run isort .
-   poetry run flake8 .
-   poetry run mypy .
-   ```
-
-## Documentation
-
-- [Getting Started](docs/getting_started.md)
-- [CI/CD & Automation](docs/ci_cd_automation.md)
-- [Monitoring & Retraining](docs/monitoring.md)
-
-## Contributing
-
-1. Create a feature branch
-2. Make your changes
-3. Run tests and linting
-4. Submit a PR
-
-## License
-
-[Your License Here]
 
 ## Environment Setup
 
@@ -142,26 +188,6 @@ API_HOST=0.0.0.0
 API_PORT=8000
 ```
 
-Replace the placeholder values with your actual configuration:
-- `username`: Your database username
-- `password`: Your database password
-- `hostname`: Your database host
-- `database`: Your database name
-- `MLFLOW_TRACKING_URI`: Your MLflow server URL (default: http://localhost:5001)
+## License
 
-### Running the Application
-
-1. Start MLflow server (if not already running):
-```bash
-mlflow server --host 0.0.0.0 --port 5001
-```
-
-2. Start the FastAPI server:
-```bash
-uvicorn src.api.main:app --host 0.0.0.0 --port 8000
-```
-
-3. Start the Streamlit app:
-```bash
-streamlit run src/frontend/app.py
-```
+MIT
